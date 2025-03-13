@@ -7,10 +7,7 @@ import { UnverifiedUser } from './entities/unverified-user.entity';
 import { EmailModule } from '../email/email.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([User, UnverifiedUser]), // Added UnverifiedUser
-    EmailModule,
-  ],
+  imports: [TypeOrmModule.forFeature([User, UnverifiedUser]), EmailModule],
   controllers: [AuthController],
   providers: [AuthService],
   exports: [AuthService],
