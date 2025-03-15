@@ -23,8 +23,8 @@ export class AuthController {
   }
 
   // Stricter limit for API key generation
-  @Throttle({ default: { limit: 5, ttl: 60 } })
-  @Post('api-key')
+  @Throttle({ short: { limit: 5, ttl: 60000 } })
+  @Post('getApiKey') // Changed from 'api-key' to 'getApiKey'
   async getApiKey(@Body() getApiKeyDto: GetApiKeyDto) {
     return await this.authService.getApiKey(getApiKeyDto);
   }
