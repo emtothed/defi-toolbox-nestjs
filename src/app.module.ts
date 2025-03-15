@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { EmailModule } from './email/email.module';
 import { configValidationSchema } from './config/config.schema';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -29,6 +30,13 @@ import { configValidationSchema } from './config/config.schema';
     }),
     AuthModule,
     EmailModule,
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 60000, // Time window in milliseconds
+        limit: 10, // Number of requests allowed in time window
+      },
+    ]),
   ],
   controllers: [AppController],
   providers: [AppService],
