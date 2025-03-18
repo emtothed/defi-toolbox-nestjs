@@ -16,6 +16,7 @@ import { GetApiKeyDto } from './dto/get-api-key.dto';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { EmailService } from 'src/email/email.service';
+import { WalletService } from './wallet.service';
 
 interface EncryptedData {
   iv: string;
@@ -25,7 +26,6 @@ interface EncryptedData {
 
 @Injectable()
 export class AuthService {
-  private readonly encryptionKey: string;
   private readonly saltRounds: number;
 
   constructor(
@@ -35,10 +35,8 @@ export class AuthService {
     private unverifiedUserRepository: Repository<UnverifiedUser>,
     private configService: ConfigService,
     private emailService: EmailService,
+    private walletService: WalletService,
   ) {
-    this.encryptionKey = this.configService.get<string>(
-      'WALLET_ENCRYPTION_KEY',
-    );
     this.saltRounds = Number(this.configService.get<number>('SALT_ROUNDS'));
   }
 
@@ -95,19 +93,24 @@ export class AuthService {
     }
 
     try {
-      // Generate wallet and API key
-      const wallet = Wallet.createRandom();
-      const encryptedPrivateKey = this.encryptPrivateKey(wallet.privateKey);
-      const apiKey = crypto.randomBytes(32).toString('hex');
-      const apiKeyHash = await bcrypt.hash(apiKey, this.saltRounds);
+      // Generate wallet using WalletService
+      const { wallet, encryptedPrivateKey } =
+        this.walletService.generateWallet();
+
+      // Generate API key with tag
+      const apiKeyTag = crypto.randomBytes(8).toString('hex');
+      const rawApiKey = crypto.randomBytes(32).toString('hex');
+      const apiKey = `${apiKeyTag}${rawApiKey}`;
+      const apiKeyHash = await bcrypt.hash(rawApiKey, this.saltRounds);
 
       // Create verified user
       const user = this.userRepository.create({
         email: unverifiedUser.email,
         password: unverifiedUser.password,
-        walletAddress: wallet.address, // Add wallet address
-        encryptedPrivateKey: encryptedPrivateKey,
+        walletAddress: wallet.address,
+        encryptedPrivateKey,
         apiKeyHash,
+        apiKeyTag,
       });
 
       await this.userRepository.save(user);
@@ -118,8 +121,6 @@ export class AuthService {
         message: 'Email verified. Your API key has been sent to your email.',
       };
     } catch (error) {
-      console.log(error);
-
       throw new InternalServerErrorException('Error during verification');
     }
   }
@@ -136,77 +137,35 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Generate and send API key
-    const apiKey = crypto.randomBytes(32).toString('hex');
-    const apiKeyHash = await bcrypt.hash(apiKey, this.saltRounds);
+    // Generate new API key with tag
+    const apiKeyTag = crypto.randomBytes(8).toString('hex');
+    const rawApiKey = crypto.randomBytes(32).toString('hex');
+    const apiKey = `${apiKeyTag}${rawApiKey}`;
+    const apiKeyHash = await bcrypt.hash(rawApiKey, this.saltRounds);
 
-    await this.userRepository.update(user.id, { apiKeyHash });
+    await this.userRepository.update(user.id, { apiKeyHash, apiKeyTag });
     await this.emailService.sendApiKey(user.email, apiKey);
 
     return { message: 'New API key has been sent to your email.' };
   }
 
-  async validateApiKey(apiKey: string): Promise<boolean> {
+  async validateApiKeyAndGetUser(apiKey: string) {
     try {
+      const apiKeyTag = apiKey.slice(0, 16);
+      const rawApiKey = apiKey.slice(16);
+
       const user = await this.userRepository.findOne({
-        where: { apiKeyHash: await bcrypt.hash(apiKey, this.saltRounds) },
+        where: { apiKeyTag },
+        select: ['id', 'apiKeyHash', 'encryptedPrivateKey', 'email'],
       });
-      return !!user;
+
+      if (!user || !(await bcrypt.compare(rawApiKey, user.apiKeyHash))) {
+        throw new UnauthorizedException('Invalid API key');
+      }
+
+      return user;
     } catch (error) {
       throw new UnauthorizedException('Invalid API key');
-    }
-  }
-
-  private encryptPrivateKey(privateKey: string): string {
-    try {
-      const iv = crypto.randomBytes(16);
-      const cipher = crypto.createCipheriv(
-        'aes-256-gcm',
-        Buffer.from(this.encryptionKey, 'hex'),
-        iv,
-      );
-
-      const encrypted = Buffer.concat([
-        cipher.update(privateKey, 'utf8'),
-        cipher.final(),
-      ]);
-
-      const authTag = cipher.getAuthTag();
-
-      return JSON.stringify({
-        iv: iv.toString('hex'),
-        encrypted: encrypted.toString('hex'),
-        authTag: authTag.toString('hex'),
-      });
-    } catch (error) {
-      throw new BadRequestException(
-        `Error encrypting private key: ${error.message}`,
-      );
-    }
-  }
-
-  private decryptPrivateKey(encryptedData: string): string {
-    try {
-      const { iv, encrypted, authTag } = JSON.parse(
-        encryptedData,
-      ) as EncryptedData;
-
-      const decipher = crypto.createDecipheriv(
-        'aes-256-gcm',
-        Buffer.from(this.encryptionKey, 'hex'),
-        Buffer.from(iv, 'hex'),
-      );
-
-      decipher.setAuthTag(Buffer.from(authTag, 'hex'));
-
-      const decrypted = Buffer.concat([
-        decipher.update(Buffer.from(encrypted, 'hex')),
-        decipher.final(),
-      ]);
-
-      return decrypted.toString('utf8');
-    } catch (error) {
-      throw new BadRequestException('Error decrypting private key');
     }
   }
 }

@@ -25,4 +25,7 @@ export const configValidationSchema = Joi.object({
   SMTP_PORT: Joi.number().default(587),
   SMTP_USER: Joi.string().email().required(),
   SMTP_PASSWORD: Joi.string().required(),
+
+  // Blockchain
+  CHAIN_ID: Joi.number().valid(1, 11155111).default(1),
 });

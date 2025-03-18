@@ -7,6 +7,8 @@ import { AuthModule } from './auth/auth.module';
 import { EmailModule } from './email/email.module';
 import { configValidationSchema } from './config/config.schema';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { Web3UtilsModule } from './web3/utils/web3-utils.module';
+import { AaveModule } from './web3/aave/aave.module';
 
 @Module({
   imports: [
@@ -37,6 +39,8 @@ import { ThrottlerModule } from '@nestjs/throttler';
         limit: 10, // Number of requests allowed in time window
       },
     ]),
+    Web3UtilsModule,
+    AaveModule,
   ],
   controllers: [AppController],
   providers: [AppService],
