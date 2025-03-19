@@ -10,12 +10,14 @@ import { TokenSymbol } from '../config/tokens.config';
 
 export enum Protocol {
   AAVE = 'aave',
+  LIFI = 'lifi',
   // Add other protocols later
 }
 
 export enum TransactionType {
   SUPPLY = 'supply',
   WITHDRAW = 'withdraw',
+  BRIDGE = 'bridge',
   // Add other types later
 }
 
@@ -39,10 +41,7 @@ export class Transaction {
   })
   type: TransactionType;
 
-  @Column({
-    type: 'enum',
-    enum: TokenSymbol,
-  })
+  @Column()
   token: string;
 
   @Column('decimal', { precision: 65, scale: 18 })
