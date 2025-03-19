@@ -9,6 +9,7 @@ import {
 import { AaveService } from './aave.service';
 import { ApiKeyGuard } from '../../auth/guards/api-key.guard';
 import { SupplyDto } from './dto/supply.dto';
+import { WithdrawDto } from './dto/withdraw.dto';
 import { User } from '../../auth/entities/user.entity';
 
 @UseGuards(ApiKeyGuard)
@@ -25,6 +26,19 @@ export class AaveController {
     return await this.aaveService.supply(
       supplyDto.amount,
       supplyDto.token,
+      request.user,
+      apiKey,
+    );
+  }
+
+  @Post('withdraw')
+  async withdraw(
+    @Body() withdrawDto: WithdrawDto,
+    @Headers('x-api-key') apiKey: string,
+    @Req() request: Request & { user: User },
+  ) {
+    return await this.aaveService.withdraw(
+      withdrawDto.token,
       request.user,
       apiKey,
     );
