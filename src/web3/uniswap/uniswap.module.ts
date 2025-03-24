@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { BridgeController } from './bridge.controller';
-import { BridgeService } from './bridge.service';
+import { UniswapController } from './uniswap.controller';
+import { UniswapService } from './uniswap.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Transaction } from '../entities/transaction.entity';
 import { ConfigModule } from '@nestjs/config';
@@ -16,8 +16,8 @@ import { AuthModule } from '../../auth/auth.module';
     Web3UtilsModule,
     AuthModule,
   ],
-  controllers: [BridgeController],
-  providers: [BridgeService, WalletService],
-  exports: [BridgeService],
+  controllers: [UniswapController],
+  providers: [UniswapService, WalletService],
+  exports: [UniswapService],
 })
-export class BridgeModule {}
+export class UniswapModule {}

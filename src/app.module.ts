@@ -9,6 +9,8 @@ import { configValidationSchema } from './config/config.schema';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { Web3UtilsModule } from './web3/utils/web3-utils.module';
 import { AaveModule } from './web3/aave/aave.module';
+import { UniswapModule } from './web3/uniswap/uniswap.module';
+import { BridgeModule } from './web3/bridge/bridge.module';
 
 @Module({
   imports: [
@@ -30,8 +32,6 @@ import { AaveModule } from './web3/aave/aave.module';
       }),
       inject: [ConfigService],
     }),
-    AuthModule,
-    EmailModule,
     ThrottlerModule.forRoot([
       {
         name: 'short',
@@ -39,8 +39,12 @@ import { AaveModule } from './web3/aave/aave.module';
         limit: 10, // Number of requests allowed in time window
       },
     ]),
+    AuthModule,
+    EmailModule,
     Web3UtilsModule,
     AaveModule,
+    UniswapModule,
+    BridgeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

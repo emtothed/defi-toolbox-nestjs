@@ -11,14 +11,16 @@ import { TokenSymbol } from '../config/tokens.config';
 export enum Protocol {
   AAVE = 'aave',
   LIFI = 'lifi',
-  // Add other protocols later
+  UNISWAP = 'uniswap',
 }
 
 export enum TransactionType {
   SUPPLY = 'supply',
   WITHDRAW = 'withdraw',
   BRIDGE = 'bridge',
-  // Add other types later
+  SWAP = 'swap',
+  ADD_LIQUIDITY = 'add_liquidity',
+  REMOVE_LIQUIDITY = 'remove_liquidity',
 }
 
 @Entity()
