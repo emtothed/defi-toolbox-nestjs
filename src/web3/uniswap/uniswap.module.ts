@@ -8,6 +8,7 @@ import { WalletService } from '../../auth/wallet.service';
 import { Web3UtilsModule } from '../utils/web3-utils.module';
 import { User } from '../../auth/entities/user.entity';
 import { AuthModule } from '../../auth/auth.module';
+import { LiquidityPoolsService } from './liquidity-pools.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { AuthModule } from '../../auth/auth.module';
     AuthModule,
   ],
   controllers: [UniswapController],
-  providers: [UniswapService, WalletService],
+  providers: [UniswapService, LiquidityPoolsService, WalletService],
   exports: [UniswapService],
 })
 export class UniswapModule {}
