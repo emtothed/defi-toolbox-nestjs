@@ -1,33 +1,29 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ethers } from 'ethers';
 import { ConfigService } from '@nestjs/config';
 import { priceFeedABI } from './ABIs/priceFeed.abi';
 import { contractAddresses } from './config/contracts.config';
 import { chains, ChainId } from '../config/chains.config';
+import { WalletService } from '../../auth/wallet.service';
+import erc20Abi from './ABIs/ERC20.abi.json';
 
 @Injectable()
 export class Web3UtilsService {
   private provider: ethers.providers.JsonRpcProvider;
   private chainId: ChainId;
 
-  constructor(private configService: ConfigService) {
-    this.chainId = this.configService.get<ChainId>('CHAIN_ID') || 1;
+  constructor(
+    private configService: ConfigService,
+    private walletService: WalletService,
+  ) {
+    this.chainId = this.configService.get<ChainId>('CHAIN_ID') || 11155111;
     this.provider = new ethers.providers.JsonRpcProvider(
       chains[this.chainId].rpcUrl,
     );
   }
 
   async getNetworkGasPrice() {
-    const gasPrice = Number(await this.provider.getGasPrice());
-    const ethPrice = 3512; // Note: We might want to make this dynamic later
-    const gasUsed = 300000;
-    const txFee = ((gasPrice * gasUsed) / 10 ** 18) * ethPrice;
-
-    return {
-      gasPrice: gasPrice,
-      estimatedFee: txFee,
-      gasUsed: gasUsed,
-    };
+    return Number(await this.provider.getGasPrice());
   }
 
   async getEthPrice(): Promise<number> {
@@ -61,5 +57,79 @@ export class Web3UtilsService {
         `Failed to fetch ETH price on ${chains[this.chainId].name}`,
       );
     }
+  }
+
+  async getWalletAddress(apiKey: string): Promise<string> {
+    const wallet = await this.walletService.getWalletFromApiKey(apiKey);
+    return wallet.address;
+  }
+
+  async getBalance(
+    tokenAddress: string,
+    apiKey: string,
+  ): Promise<{ balance: string; symbol: string; decimals: number }> {
+    const wallet = await this.walletService.getWalletFromApiKey(apiKey);
+
+    if (tokenAddress === ethers.constants.AddressZero) {
+      const balance = await this.provider.getBalance(wallet.address);
+      return {
+        balance: ethers.utils.formatEther(balance),
+        symbol: 'ETH',
+        decimals: 18,
+      };
+    }
+
+    const tokenContract = new ethers.Contract(
+      tokenAddress,
+      erc20Abi,
+      this.provider,
+    );
+
+    const [balance, symbol, decimals] = await Promise.all([
+      tokenContract.balanceOf(wallet.address),
+      tokenContract.symbol(),
+      tokenContract.decimals(),
+    ]);
+
+    return {
+      balance: ethers.utils.formatUnits(balance, decimals),
+      symbol,
+      decimals,
+    };
+  }
+
+  async getPossibleMaxAmount(apiKey: string): Promise<ethers.BigNumber> {
+    // Getting user balance from provider
+
+    let userBalanceInWei;
+    try {
+      const userBalance = await this.getBalance(
+        ethers.constants.AddressZero,
+        apiKey,
+      );
+      userBalanceInWei = ethers.utils.parseUnits(
+        userBalance.balance,
+        userBalance.decimals,
+      );
+    } catch {
+      throw new BadRequestException('Failed to get balance of given address.');
+    }
+
+    // Calculating the max possible amount to transfer
+    const gasPrice = ethers.BigNumber.from(await this.getNetworkGasPrice());
+    let maxGasUsed = ethers.BigNumber.from(210000); // transfer gas fee
+    const transferGasFeeInWei = gasPrice.mul(maxGasUsed);
+
+    if (userBalanceInWei.lt(transferGasFeeInWei)) {
+      throw new BadRequestException('Balance less than estimated gas fees.');
+    }
+    const possibleMaxAmountInWei = userBalanceInWei.sub(transferGasFeeInWei);
+    console.log(
+      ` Possible max amount to transfer is : ${ethers.utils.formatEther(
+        possibleMaxAmountInWei,
+      )}`,
+    );
+
+    return possibleMaxAmountInWei;
   }
 }
