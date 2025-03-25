@@ -6,6 +6,11 @@ import { contractAddresses } from './config/contracts.config';
 import { chains, ChainId } from '../config/chains.config';
 import { WalletService } from '../../auth/wallet.service';
 import erc20Abi from './ABIs/ERC20.abi.json';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Transaction } from '../entities/transaction.entity';
+import { User } from '../../auth/entities/user.entity';
+import { TransactionHistoryDto } from './dto/transaction-history.dto';
 
 @Injectable()
 export class Web3UtilsService {
@@ -15,6 +20,8 @@ export class Web3UtilsService {
   constructor(
     private configService: ConfigService,
     private walletService: WalletService,
+    @InjectRepository(Transaction)
+    private transactionRepository: Repository<Transaction>,
   ) {
     this.chainId = this.configService.get<ChainId>('CHAIN_ID') || 11155111;
     this.provider = new ethers.providers.JsonRpcProvider(
@@ -131,5 +138,35 @@ export class Web3UtilsService {
     );
 
     return possibleMaxAmountInWei;
+  }
+
+  async getTransactionHistory(
+    user: User,
+    filters?: TransactionHistoryDto,
+  ): Promise<Transaction[]> {
+    const queryBuilder = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .where('transaction.userId = :userId', { userId: user.id })
+      .orderBy('transaction.createdAt', 'DESC');
+
+    if (filters?.protocol) {
+      queryBuilder.andWhere('transaction.protocol = :protocol', {
+        protocol: filters.protocol,
+      });
+    }
+
+    if (filters?.type) {
+      queryBuilder.andWhere('transaction.type = :type', {
+        type: filters.type,
+      });
+    }
+
+    if (filters?.token) {
+      queryBuilder.andWhere('transaction.token LIKE :token', {
+        token: `%${filters.token}%`,
+      });
+    }
+
+    return await queryBuilder.getMany();
   }
 }
